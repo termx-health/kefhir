@@ -130,15 +130,14 @@ public class PgResourceStorage implements ResourceStorage {
     version.getContent().setValue(JsonUtil.toJson(resource));
   }
 
-  private List<VersionId> findProfiles(ResourceVersion version) {
+  private List<String> findProfiles(ResourceVersion version) {
     Resource resource = resourceFormatService.parse(version.getContent());
     if (resource.getMeta() == null || resource.getMeta().getProfile() == null) {
       return null;
     }
     return resource.getMeta().getProfile().stream()
-        .map(p -> ConformanceHolder.getDefinitions().stream().filter(def -> def.getUrl().equals(p.getValue())).findFirst().orElse(null))
+        .map(p -> p.getValue())
         .filter(Objects::nonNull)
-        .map(def -> new VersionId(def.getResourceType().name(), def.getId(), Integer.valueOf(def.getMeta().getVersionId())))
         .collect(Collectors.toList());
   }
 

@@ -190,7 +190,6 @@ public class BundleService implements BundleSaveHandler {
     }
     req.setType(StringUtils.substringBefore(uri.getPath(), "/"));
     req.setPath(StringUtils.removeStart(uri.getPath(), req.getType()));
-    req.setUri(uri.toString());
     req.putQuery(uri.getQuery());
     req.putHeader("If-None-Exist", entry.getRequest().getIfNoneExist());
     req.setContentType(MediaType.APPLICATION_JSON_TYPE);

@@ -138,7 +138,6 @@ public class RuleThemAllFhirController {
     }
     request.getHeaders().forEachValue(req::putHeader);
     request.getParameters().forEachValue(req::putParameter);
-    req.setUri(req.getUri());
     req.setBody(request.getBody(String.class).orElse(null));
     return req;
   }

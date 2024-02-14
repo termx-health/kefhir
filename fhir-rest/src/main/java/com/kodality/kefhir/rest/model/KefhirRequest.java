@@ -25,7 +25,6 @@ public class KefhirRequest {
   private String path;
   private Map<String, List<String>> parameters = new LinkedHashMap<>();
   private Map<String, List<String>> headers = new LinkedHashMap<>();
-  private String uri;
   private String serverUri;
   private String serverHost;
   private String body;

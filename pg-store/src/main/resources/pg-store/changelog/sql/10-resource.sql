@@ -25,6 +25,7 @@ SELECT setval('store.resource_id_seq', nextval('store.resource_key_seq'));
 create index on store.resource(updated);
 --
 
---changeset kefhir:add-profile
-alter table store.resource add column profiles bigint[]; --references store.resource(uid)
+--changeset kefhir:add-profile-2
+alter table store.resource drop column if exists profiles;
+alter table store.resource add column profiles text[];
 --
