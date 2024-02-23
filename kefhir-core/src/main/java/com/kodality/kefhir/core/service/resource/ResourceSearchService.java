@@ -14,6 +14,7 @@ package com.kodality.kefhir.core.service.resource;
 
 import com.kodality.kefhir.core.api.resource.ResourceBeforeSearchInterceptor;
 import com.kodality.kefhir.core.api.resource.ResourceSearchHandler;
+import com.kodality.kefhir.core.exception.FhirException;
 import com.kodality.kefhir.core.exception.FhirServerException;
 import com.kodality.kefhir.core.model.ResourceId;
 import com.kodality.kefhir.core.model.ResourceVersion;
@@ -36,6 +37,7 @@ import jakarta.inject.Singleton;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.hl7.fhir.r5.model.Enumerations.SearchParamType;
+import org.hl7.fhir.r5.model.OperationOutcome.IssueType;
 
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
@@ -99,6 +101,9 @@ public class ResourceSearchService {
       String searchParam = includeTokens[1];
       String targetType = includeTokens[2];
       List<String> expressions = findReferenceParams(resourceType, searchParam);
+      if (CollectionUtils.isEmpty(expressions)) {
+        throw new FhirException(400, IssueType.INVALID, "Could not find SearchParameter with code '" + searchParam + "' for resource '" + resourceType + "'");
+      }
       List<ResourceVersion> entries = new ArrayList<>(result.getEntries());
       if ("iterate".equals(ip.getModifier())) {
         entries.addAll(result.getIncludes());
