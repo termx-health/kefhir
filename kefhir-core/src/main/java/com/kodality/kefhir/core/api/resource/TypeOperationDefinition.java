@@ -14,15 +14,9 @@
 
 import com.kodality.kefhir.structure.api.ResourceContent;
 
-public interface TypeOperationDefinition {
-
-  String getResourceType();
-
-  String getOperationName();
-
+public interface TypeOperationDefinition extends BaseOperationDefinition {
   /**
    * @return Parameters or Resource
    */
   ResourceContent run(ResourceContent parameters);
-
 }
