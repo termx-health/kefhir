@@ -15,7 +15,7 @@
 import com.kodality.kefhir.core.model.ResourceId;
 import com.kodality.kefhir.structure.api.ResourceContent;
 
-public interface InstanceOperationDefinition {
+public interface InstanceOperationDefinition extends BaseOperationDefinition {
 
   String getResourceType();
 
