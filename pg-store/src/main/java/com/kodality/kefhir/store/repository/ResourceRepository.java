@@ -13,6 +13,7 @@
 package com.kodality.kefhir.store.repository;
 
 import com.google.common.collect.Lists;
+import com.google.common.collect.Streams;
 import com.kodality.kefhir.core.model.ResourceId;
 import com.kodality.kefhir.core.model.ResourceVersion;
 import com.kodality.kefhir.core.model.VersionId;
@@ -27,6 +28,7 @@ import java.util.stream.Collectors;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;;
 import jakarta.inject.Singleton;
+import java.util.stream.Stream;
 import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.dao.IncorrectResultSizeDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -46,7 +48,7 @@ public class ResourceRepository {
 
   public String getNextResourceId() {
     //TODO: may already exist
-    return String.valueOf(jdbcTemplate.queryForObject("select nextval('store.resource_id_seq')", Long.class));
+    return String.valueOf(jdbcTemplate.queryForObject("SELECT nextval('store.resource_id_seq')", Long.class));
   }
 
   public void create(ResourceVersion version, List<String> profiles) {
@@ -69,17 +71,28 @@ public class ResourceRepository {
     return jdbcTemplate.queryForObject(sql, Integer.class, id.getResourceType(), id.getResourceId());
   }
 
-  public List<ResourceVersion> load(List<ResourceId> ids) {
+  public List<ResourceVersion> load(List<VersionId> ids) {
     if (CollectionUtils.isEmpty(ids)) {
       return List.of();
     }
-    return Lists.partition(ids, 100).stream().flatMap(pids -> {
-      SqlBuilder sb = new SqlBuilder();
-      sb.append("SELECT * FROM store.resource r WHERE sys_status = 'A'");
-      sb.append(" and (type, id) in (").append(pids.stream().map(id -> "(?,?)").collect(joining(","))).append(")");
-      pids.forEach(id -> sb.add(id.getResourceType(), id.getResourceId()));
-      return jdbcTemplate.query(sb.getSql(), new ResourceRowMapper(), sb.getParams()).stream();
-    }).collect(Collectors.toList());
+    List<VersionId> unversioned = ids.stream().filter(id -> id.getVersion() == null).toList();
+    List<VersionId> versioned = ids.stream().filter(id -> id.getVersion() != null).toList();
+    return Stream.concat(
+        Lists.partition(unversioned, 100).stream().flatMap(pids -> {
+          SqlBuilder sb = new SqlBuilder();
+          sb.append("SELECT * FROM store.resource r WHERE sys_status = 'A'");
+          sb.append(" and (type, id) in (").append(pids.stream().map(id -> "(?,?)").collect(joining(","))).append(")");
+          pids.forEach(id -> sb.add(id.getResourceType(), id.getResourceId()));
+          return jdbcTemplate.query(sb.getSql(), new ResourceRowMapper(), sb.getParams()).stream();
+        }),
+        Lists.partition(versioned, 100).stream().flatMap(pids -> {
+          SqlBuilder sb = new SqlBuilder();
+          sb.append("SELECT * FROM store.resource r WHERE");
+          sb.append(" (type, id, version) in (").append(pids.stream().map(id -> "(?,?,?)").collect(joining(","))).append(")");
+          pids.forEach(id -> sb.add(id.getResourceType(), id.getResourceId(), id.getVersion()));
+          return jdbcTemplate.query(sb.getSql(), new ResourceRowMapper(), sb.getParams()).stream();
+        })
+    ).collect(Collectors.toList());
   }
 
   public ResourceVersion load(VersionId id) {
