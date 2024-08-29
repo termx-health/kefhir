@@ -61,6 +61,10 @@ subprojects { Project project ->
     withJavadocJar()
   }
 
+  tasks.withType(Javadoc).configureEach {
+    options.addStringOption('Xdoclint:-missing', '-quiet')
+  }
+
   signing {
     required {false} // sign only if configured
     if (System.getenv('GPG_KEY')) {

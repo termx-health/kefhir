@@ -6,21 +6,21 @@
 # eg: ./publish-to-maven-central.sh 1.0.0
 
 modules=(
-#fhir-structures
+fhir-structures
 kefhir-core
-#tx-manager
-#fhir-conformance
-#fhir-rest
-#validation-profile
-#pg-core
-#pg-store
-#pg-search
-#auth-core
-#auth-openid
-#auth-smart
-#auth-rest
-#feature-conditional-reference
-#openapi
+tx-manager
+fhir-conformance
+fhir-rest
+validation-profile
+pg-core
+pg-store
+pg-search
+auth-core
+auth-openid
+auth-smart
+auth-rest
+feature-conditional-reference
+openapi
 )
 
 ver=$1

@@ -75,8 +75,10 @@ release tag:
 
 release tag to maven central:
   stage: release
+  when: manual
   script:
     - export APP_VERSION="$CI_COMMIT_REF_NAME"
+    - apt update && apt install -y curl zip
     - ./publish-to-maven-central.sh "$APP_VERSION"
   only:
     - /^R\d*\.\d*\.\d*$/
