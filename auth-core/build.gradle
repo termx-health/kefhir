@@ -1,2 +1,4 @@
+description = "Kefhir module - common authentication objects"
+
 dependencies {
 }

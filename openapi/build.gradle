@@ -1,3 +1,5 @@
+description = "Kefhir module - Provides Openapi support"
+
 dependencies {
   api project(':fhir-structures')
   api project(':kefhir-core')

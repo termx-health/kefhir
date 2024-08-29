@@ -1,3 +1,4 @@
+description = "Kefhir module - Core module, responsible for fhir resouce lifecycle, conformance initialization"
 
 dependencies {
   api project(':fhir-structures')

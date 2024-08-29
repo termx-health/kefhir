@@ -1,3 +1,5 @@
+description = "Kefhir module - Provides possibilities to load initial conformance resources"
+
 dependencies {
   api project(':kefhir-core')
   api project(':fhir-structures')

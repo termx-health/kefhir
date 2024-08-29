@@ -1,3 +1,5 @@
+description = "Kefhir module - base interfaces for adding authentication to rest endpoints"
+
 dependencies {
   api project(':auth-core')
   api project(':fhir-rest')

@@ -73,6 +73,16 @@ release tag:
   except:
     - branches
 
+release tag to maven central:
+  stage: release
+  script:
+    - export APP_VERSION="$CI_COMMIT_REF_NAME"
+    - ./publish-to-maven-central.sh "$APP_VERSION"
+  only:
+    - /^R\d*\.\d*\.\d*$/
+  except:
+    - branches
+
 release scripts:
   image: registry.gitlab.com/kodality/fhir/kefhir/kefhir-builder:latest
   stage: release

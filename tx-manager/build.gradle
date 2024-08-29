@@ -1,2 +1,4 @@
+description = "Kefhir module - Database transaction support"
+
 dependencies {
 }

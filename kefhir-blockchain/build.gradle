@@ -1,3 +1,5 @@
+description = "Kefhir module - Example implementation of resource forward to some blockchain"
+
 dependencies {
   api project(':kefhir-core')
 }

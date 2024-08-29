@@ -1,4 +1,6 @@
 
+description = "Kefhir module - Provides fhir REST interfaces"
+
 dependencies {
   api project(':fhir-structures')
   api project(':tx-manager')
