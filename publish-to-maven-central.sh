@@ -33,7 +33,7 @@ pw=$SONATYPE_PASSWORD
 auth=$(echo "${user}:${pw}" | base64)
 
 build() {
-  gr -Pversion=$ver clean assemble generatePom sign || exit 1
+  ./gradlew -Pversion=$ver clean assemble generatePom sign || exit 1
 }
 
 publish() {
