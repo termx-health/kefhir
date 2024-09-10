@@ -92,7 +92,7 @@ subprojects { Project project ->
             }
             developers {
               developer {
-                name = 'Kefhir Dev Team'
+                name = 'Kodality'
               }
             }
             licenses {
