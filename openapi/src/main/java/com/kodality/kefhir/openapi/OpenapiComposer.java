@@ -269,8 +269,13 @@ public class OpenapiComposer implements ConformanceUpdateListener {
   }
 
   private Content buildResourceApiContent(String resourceType) {
-    IBaseResource example = hapiContextHolder.getContext().getResourceDefinition(resourceType).newInstance();
-    String exampleJson = hapiContextHolder.getContext().newJsonParser().setPrettyPrint(true).encodeResourceToString(example);
+    String exampleJson;
+    if (!hapiContextHolder.getContext().getResourceTypes().contains(resourceType)) {
+      exampleJson = "{}";
+    } else {
+      IBaseResource example = hapiContextHolder.getContext().getResourceDefinition(resourceType).newInstance();
+      exampleJson = hapiContextHolder.getContext().newJsonParser().setPrettyPrint(true).encodeResourceToString(example);
+    }
 
     Content result = new Content();
     MediaType jsonSchema = new MediaType().schema(new ObjectSchema().$ref("#/components/schemas/fhir_Resource"));
