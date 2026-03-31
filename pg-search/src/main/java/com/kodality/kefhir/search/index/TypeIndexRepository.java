@@ -29,7 +29,7 @@ import com.kodality.kefhir.util.sql.SqlBuilder;
 import java.util.List;
 import java.util.stream.Stream;
 import jakarta.inject.Inject;
-import jakarta.inject.Named;;
+import jakarta.inject.Named;
 import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.jdbc.core.JdbcTemplate;
 

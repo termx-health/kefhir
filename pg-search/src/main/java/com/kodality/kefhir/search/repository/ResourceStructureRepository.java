@@ -26,7 +26,7 @@ package com.kodality.kefhir.search.repository;
 import java.util.HashMap;
 import java.util.Map;
 import jakarta.inject.Inject;
-import jakarta.inject.Named;;
+import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import org.springframework.jdbc.core.JdbcTemplate;
 

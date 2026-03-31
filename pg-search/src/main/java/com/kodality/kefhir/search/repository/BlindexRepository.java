@@ -34,7 +34,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import jakarta.inject.Inject;
-import jakarta.inject.Named;;
+import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;

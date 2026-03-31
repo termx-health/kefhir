@@ -62,7 +62,7 @@ subprojects { Project project ->
   }
 
   tasks.withType(Javadoc).configureEach {
-    options.addStringOption('Xdoclint:-missing', '-quiet')
+    options.addStringOption('Xdoclint:none', '-quiet')
   }
 
   signing {
