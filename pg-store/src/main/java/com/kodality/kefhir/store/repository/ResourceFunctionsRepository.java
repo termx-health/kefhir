@@ -23,7 +23,7 @@
  */
 package com.kodality.kefhir.store.repository;
 
-import jakarta.inject.Named;;
+import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import org.springframework.jdbc.core.JdbcTemplate;
 

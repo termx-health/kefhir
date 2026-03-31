@@ -3,7 +3,7 @@ package com.kodality.kefhir.scheduler;
 import java.util.Date;
 import java.util.List;
 import jakarta.inject.Inject;
-import jakarta.inject.Named;;
+import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import org.springframework.jdbc.core.JdbcTemplate;
 
