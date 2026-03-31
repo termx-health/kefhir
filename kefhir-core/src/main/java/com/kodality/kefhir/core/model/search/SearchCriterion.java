@@ -119,4 +119,16 @@ public class SearchCriterion {
     return ObjectUtils.max(1, Integer.valueOf(_page.get(0).getValues().get(0)));
   }
 
+  public String getSummary() {
+    List<QueryParam> _summary = getResultParams(_SUMMARY);
+    if (CollectionUtils.isEmpty(_summary) || CollectionUtils.isEmpty(_summary.get(0).getValues())) {
+      return null;
+    }
+    return _summary.get(0).getValues().get(0);
+  }
+
+  public boolean isSummaryCount() {
+    return "count".equals(getSummary());
+  }
+
 }
