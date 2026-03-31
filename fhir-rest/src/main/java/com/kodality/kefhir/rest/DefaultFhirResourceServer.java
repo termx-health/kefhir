@@ -172,6 +172,13 @@ public class DefaultFhirResourceServer extends BaseFhirResourceServer {
   @Override
   public KefhirResponse search(KefhirRequest req) {
     SearchCriterion criteria = SearchCriterionBuilder.parse(req.getParameters(), req.getType());
+    if (criteria.isSummaryCount()) {
+      Map<String, List<String>> countParams = new HashMap<>(req.getParameters());
+      countParams.put(SearchCriterion._COUNT, List.of("0"));
+      SearchCriterion countCriteria = SearchCriterionBuilder.parse(countParams, req.getType());
+      SearchResult result = resourceSearchService.search(countCriteria);
+      return new KefhirResponse(200, BundleUtil.composeCountOnly(result.getTotal()));
+    }
     SearchResult result = resourceSearchService.search(criteria);
     Bundle bundle = BundleUtil.compose(result);
     addPagingLinks(bundle, criteria.getCount(), criteria.getPage(), req);
@@ -199,6 +206,13 @@ public class DefaultFhirResourceServer extends BaseFhirResourceServer {
     query.put(compartmentParams.get(0), List.of(id));
 
     SearchCriterion criteria = SearchCriterionBuilder.parse(query, compartment);
+    if (criteria.isSummaryCount()) {
+      Map<String, List<String>> countParams = new HashMap<>(query);
+      countParams.put(SearchCriterion._COUNT, List.of("0"));
+      SearchCriterion countCriteria = SearchCriterionBuilder.parse(countParams, compartment);
+      SearchResult result = resourceSearchService.search(countCriteria);
+      return new KefhirResponse(200, BundleUtil.composeCountOnly(result.getTotal()));
+    }
     SearchResult result = resourceSearchService.search(criteria);
     Bundle bundle = BundleUtil.compose(result);
     addPagingLinks(bundle, criteria.getCount(), criteria.getPage(), req);

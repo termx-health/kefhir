@@ -92,6 +92,9 @@ public class ResourceSearchService {
     }
     beforeSearchInterceptors.forEach(i -> i.handle(criteria));
     SearchResult result = searchHandler.search(criteria);
+    if (criteria.isSummaryCount()) {
+      return result;
+    }
     List<VersionId> loadIds = result.getEntries().stream().filter(e -> e.getContent() == null).map(ResourceVersion::getId).collect(toList());
     Map<String, ResourceVersion> versions = storageService.load(loadIds).stream().collect(toMap(v -> v.getId().getResourceReference(), v -> v));
     result.getEntries()

@@ -83,6 +83,13 @@ public class BundleUtil {
     return bundle;
   }
 
+  public static Bundle composeCountOnly(Integer total) {
+    Bundle bundle = new Bundle();
+    bundle.setType(BundleType.SEARCHSET);
+    bundle.setTotal(total != null ? total : 0);
+    return bundle;
+  }
+
   private static BundleEntryComponent composeEntry(ResourceVersion version) {
     BundleEntryComponent entry = new BundleEntryComponent();
     VersionId id = version.getId();
