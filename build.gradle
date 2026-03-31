@@ -84,11 +84,11 @@ subprojects { Project project ->
           pom {
             name = project.name
             description = project.description
-            url = 'https://gitlab.com/kodality/fhir/kefhir'
+            url = 'https://github.com/termx-health/kefhir'
             scm {
-              url = 'https://gitlab.com/kodality/fhir/kefhir'
-              connection = "scm:git:https://gitlab.com/kodality/fhir/kefhir.git"
-              developerConnection = "scm:git:git@gitlab.com:kodality/fhir/kefhir.git"
+              url = 'https://github.com/termx-health/kefhir'
+              connection = "scm:git:https://github.com/termx-health/kefhir.git"
+              developerConnection = "scm:git:git@github.com:termx-health/kefhir.git"
             }
             developers {
               developer {
@@ -106,12 +106,11 @@ subprojects { Project project ->
       }
       repositories {
         maven {
-          def releasesRepoUrl = "https://kexus.kodality.com/repository/maven-releases/"
-          def snapshotsRepoUrl = "https://kexus.kodality.com/repository/maven-snapshots/"
-          url = version.endsWith('SNAPSHOT') ? snapshotsRepoUrl : releasesRepoUrl
+          name = "GitHubPackages"
+          url = uri("https://maven.pkg.github.com/termx-health/kefhir")
           credentials {
-            username = project.hasProperty('kodalityNexusUser') ? project.property('kodalityNexusUser') : System.getenv('KODALITY_NEXUS_USER')
-            password = project.hasProperty('kodalityNexusPassword') ? project.property('kodalityNexusPassword') : System.getenv('KODALITY_NEXUS_PASSWORD')
+            username = project.hasProperty('gpr.user') ? project.property('gpr.user') : System.getenv('GITHUB_ACTOR')
+            password = project.hasProperty('gpr.key') ? project.property('gpr.key') : System.getenv('GITHUB_TOKEN')
           }
         }
       }
