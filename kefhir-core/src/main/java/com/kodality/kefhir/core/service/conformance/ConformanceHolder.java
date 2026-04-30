@@ -47,6 +47,8 @@ public class ConformanceHolder {
   protected static CapabilityStatement capabilityStatement;
   protected static TerminologyCapabilities terminologyCapabilities;
   protected static List<StructureDefinition> definitions;
+  //resource type -> summary path index built from StructureDefinitions
+  protected static Map<String, SummaryPathIndex> summaryIndex;
   //resource type -> code -> param
   protected static Map<String, Map<String, SearchParameter>> searchParamGroups;
   protected static Map<String, SearchParameter> searchParams;
@@ -66,6 +68,18 @@ public class ConformanceHolder {
 
   protected static void setStructureDefinitions(List<StructureDefinition> definitions) {
     ConformanceHolder.definitions = new ArrayList<>(definitions);
+    Map<String, SummaryPathIndex> index = new HashMap<>();
+    for (StructureDefinition sd : definitions) {
+      if (sd.getKind() == null || sd.getKind() != StructureDefinition.StructureDefinitionKind.RESOURCE) {
+        continue;
+      }
+      String type = sd.getType();
+      if (type == null || index.containsKey(type)) {
+        continue;
+      }
+      index.put(type, SummaryPathIndex.from(sd));
+    }
+    ConformanceHolder.summaryIndex = index;
   }
 
   protected static void setSearchParamGroups(List<SearchParameter> searchParamGroups) {
@@ -122,6 +136,10 @@ public class ConformanceHolder {
 
   public static List<StructureDefinition> getDefinitions() {
     return definitions == null ? new ArrayList<>() : new ArrayList<>(definitions);
+  }
+
+  public static SummaryPathIndex getSummaryIndex(String resourceType) {
+    return summaryIndex == null ? null : summaryIndex.get(resourceType);
   }
 
   public static List<ValueSet> getValueSets() {

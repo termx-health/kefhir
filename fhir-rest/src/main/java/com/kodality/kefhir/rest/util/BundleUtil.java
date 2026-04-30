@@ -26,6 +26,7 @@ package com.kodality.kefhir.rest.util;
 import com.kodality.kefhir.core.model.ResourceVersion;
 import com.kodality.kefhir.core.model.VersionId;
 import com.kodality.kefhir.core.model.search.SearchResult;
+import com.kodality.kefhir.core.util.SummaryProcessor;
 import com.kodality.kefhir.structure.service.ResourceFormatService;
 import java.util.List;
 import org.apache.commons.collections4.CollectionUtils;
@@ -41,18 +42,22 @@ import org.hl7.fhir.r5.model.Bundle.SearchEntryMode;
 public class BundleUtil {
 
   public static Bundle compose(List<ResourceVersion> versions, BundleType bundleType) {
-    return compose(null, versions, bundleType);
+    return compose(null, versions, bundleType, null);
   }
 
   public static Bundle compose(SearchResult search) {
-    Bundle bundle = compose(search.getTotal(), search.getEntries(), BundleType.SEARCHSET);
+    return compose(search, null);
+  }
+
+  public static Bundle compose(SearchResult search, SummaryProcessor.Mode summaryMode) {
+    Bundle bundle = compose(search.getTotal(), search.getEntries(), BundleType.SEARCHSET, summaryMode);
     if (CollectionUtils.isNotEmpty(search.getIncludes())) {
       bundle.getEntry().forEach(e -> {
         e.setSearch(new BundleEntrySearchComponent());
         e.getSearch().setMode(SearchEntryMode.MATCH);
       });
       search.getIncludes().forEach(v -> {
-        BundleEntryComponent e = composeEntry(v);
+        BundleEntryComponent e = composeEntry(v, summaryMode);
         e.setSearch(new BundleEntrySearchComponent());
         e.getSearch().setMode(SearchEntryMode.INCLUDE);
         bundle.addEntry(e);
@@ -62,11 +67,15 @@ public class BundleUtil {
   }
 
   public static Bundle compose(Integer total, List<ResourceVersion> versions, BundleType bundleType) {
+    return compose(total, versions, bundleType, null);
+  }
+
+  public static Bundle compose(Integer total, List<ResourceVersion> versions, BundleType bundleType, SummaryProcessor.Mode summaryMode) {
     Bundle bundle = new Bundle();
     bundle.setTotal(total == null ? versions.size() : total);
     bundle.setType(bundleType);
     versions.forEach(v -> {
-      BundleEntryComponent entry = composeEntry(v);
+      BundleEntryComponent entry = composeEntry(v, summaryMode);
       bundle.addEntry(entry);
       if (bundleType == BundleType.HISTORY) {
         BundleEntryRequestComponent request = new BundleEntryRequestComponent();
@@ -91,11 +100,23 @@ public class BundleUtil {
   }
 
   private static BundleEntryComponent composeEntry(ResourceVersion version) {
+    return composeEntry(version, null);
+  }
+
+  private static BundleEntryComponent composeEntry(ResourceVersion version, SummaryProcessor.Mode summaryMode) {
     BundleEntryComponent entry = new BundleEntryComponent();
     VersionId id = version.getId();
     entry.setFullUrl(id.getFullUrl() != null ? id.getFullUrl() : id.getResourceReference());
-    entry.setResource(ResourceFormatService.get().parse(version.getContent().getValue()));
+    String content = version.getContent().getValue();
+    if (summaryMode != null && summaryMode != SummaryProcessor.Mode.FALSE && isJson(version.getContent().getContentType())) {
+      content = SummaryProcessor.apply(content, id.getResourceType(), summaryMode);
+    }
+    entry.setResource(ResourceFormatService.get().parse(content));
     return entry;
+  }
+
+  private static boolean isJson(String contentType) {
+    return contentType == null || contentType.toLowerCase().contains("json");
   }
 
   private static HTTPVerb calcMethod(ResourceVersion version) {
