@@ -40,36 +40,21 @@ public class SummaryProcessorTest {
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
   // Hand-rolled index for ValueSet — only fields we care about in tests.
+  // Mirrors the production SummaryPathIndex.from() output: literal paths only, no ancestor closure.
   private static SummaryPathIndex valueSetIndex() {
-    Set<String> summary = new HashSet<>();
-    addWithAncestors(summary, "ValueSet");
-    addWithAncestors(summary, "ValueSet.url");
-    addWithAncestors(summary, "ValueSet.name");
-    addWithAncestors(summary, "ValueSet.status");
-
-    Set<String> mandatory = new HashSet<>();
-    addWithAncestors(mandatory, "ValueSet.status");
-
-    Set<String> text = new HashSet<>();
-    text.add("ValueSet");
-    text.add("ValueSet.id");
-    text.add("ValueSet.meta");
-    text.add("ValueSet.text");
-    text.addAll(mandatory);
-
+    Set<String> summary = new HashSet<>(Set.of(
+        "ValueSet.url",
+        "ValueSet.name",
+        "ValueSet.status"
+    ));
+    Set<String> mandatory = new HashSet<>(Set.of("ValueSet.status"));
+    Set<String> text = new HashSet<>(Set.of(
+        "ValueSet.id",
+        "ValueSet.meta",
+        "ValueSet.text",
+        "ValueSet.status"
+    ));
     return new SummaryPathIndex("ValueSet", summary, mandatory, text);
-  }
-
-  private static void addWithAncestors(Set<String> set, String path) {
-    int idx = path.length();
-    while (idx > 0) {
-      set.add(path.substring(0, idx));
-      int dot = path.lastIndexOf('.', idx - 1);
-      if (dot < 0) {
-        break;
-      }
-      idx = dot;
-    }
   }
 
   private static String resource() {
