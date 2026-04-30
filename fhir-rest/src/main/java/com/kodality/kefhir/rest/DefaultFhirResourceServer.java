@@ -15,6 +15,7 @@ import com.kodality.kefhir.core.service.resource.ResourceSearchService;
 import com.kodality.kefhir.core.service.resource.ResourceService;
 import com.kodality.kefhir.core.util.DateUtil;
 import com.kodality.kefhir.core.util.ResourceUtil;
+import com.kodality.kefhir.core.util.SummaryProcessor;
 import com.kodality.kefhir.rest.model.KefhirRequest;
 import com.kodality.kefhir.rest.model.KefhirResponse;
 import com.kodality.kefhir.rest.util.BundleUtil;
@@ -68,7 +69,7 @@ public class DefaultFhirResourceServer extends BaseFhirResourceServer {
     if (version.isDeleted()) {
       return new KefhirResponse(410).header("ETag", version.getETag());
     }
-    return new KefhirResponse(200, version.getContent())
+    return new KefhirResponse(200, applySummary(version.getContent(), req))
         .header("Content-Location", uri(version, req))
         .header("Last-Modified", DateUtil.format(version.getModified(), DateUtil.ISO_DATETIME))
         .header("ETag", version.getETag());
@@ -80,9 +81,34 @@ public class DefaultFhirResourceServer extends BaseFhirResourceServer {
     if (version.isDeleted()) {
       return new KefhirResponse(410).header("ETag", version.getETag());
     }
-    return new KefhirResponse(200, version.getContent())
+    return new KefhirResponse(200, applySummary(version.getContent(), req))
         .header("Last-Modified", DateUtil.format(version.getModified(), DateUtil.ISO_DATETIME))
         .header("ETag", version.getETag());
+  }
+
+  private static ResourceContent applySummary(ResourceContent content, KefhirRequest req) {
+    SummaryProcessor.Mode mode = readSummaryMode(req);
+    if (mode == null || mode == SummaryProcessor.Mode.FALSE) {
+      return content;
+    }
+    String contentType = content.getContentType();
+    if (contentType != null && !contentType.toLowerCase().contains("json")) {
+      return content;
+    }
+    String shaped = SummaryProcessor.apply(content.getValue(), req.getType(), mode);
+    return new ResourceContent(shaped, content.getContentType());
+  }
+
+  private static SummaryProcessor.Mode readSummaryMode(KefhirRequest req) {
+    Map<String, List<String>> params = req.getParameters();
+    if (params == null) {
+      return null;
+    }
+    List<String> values = params.get(SearchCriterion._SUMMARY);
+    if (values == null || values.isEmpty()) {
+      return null;
+    }
+    return SummaryProcessor.parse(values.get(0));
   }
 
   @Override
@@ -180,7 +206,7 @@ public class DefaultFhirResourceServer extends BaseFhirResourceServer {
       return new KefhirResponse(200, BundleUtil.composeCountOnly(result.getTotal()));
     }
     SearchResult result = resourceSearchService.search(criteria);
-    Bundle bundle = BundleUtil.compose(result);
+    Bundle bundle = BundleUtil.compose(result, readSummaryMode(req));
     addPagingLinks(bundle, criteria.getCount(), criteria.getPage(), req);
     return new KefhirResponse(200, bundle);
   }
@@ -214,7 +240,7 @@ public class DefaultFhirResourceServer extends BaseFhirResourceServer {
       return new KefhirResponse(200, BundleUtil.composeCountOnly(result.getTotal()));
     }
     SearchResult result = resourceSearchService.search(criteria);
-    Bundle bundle = BundleUtil.compose(result);
+    Bundle bundle = BundleUtil.compose(result, readSummaryMode(req));
     addPagingLinks(bundle, criteria.getCount(), criteria.getPage(), req);
     return new KefhirResponse(200, bundle);
   }
