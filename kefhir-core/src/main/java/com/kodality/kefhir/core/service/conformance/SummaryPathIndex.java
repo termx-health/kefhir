@@ -42,9 +42,11 @@ import org.hl7.fhir.r5.model.StructureDefinition;
  *  - DATA  -> any path EXCEPT {@code <ResourceType>.text}
  *  - FALSE -> all paths
  *
- * Ancestry: {@code summaryPaths} and {@code textPaths} are closed under ancestry (if
- * {@code A.b.c} is in the set, so are {@code A.b} and {@code A}). This lets the walker decide
- * "drop everything below this object" in one set lookup.
+ * No ancestor closure: an element is kept iff its OWN path matches. FHIR's design is that if
+ * a leaf is summary, its ancestors are summary too — so closure was redundant. Closing also
+ * broke {@code _summary=true} on resources where {@code modifierExtension} (always summary
+ * per FHIR spec) sits beneath a non-summary parent like {@code CodeSystem.concept}: the
+ * closure dragged every such parent into the keep set.
  */
 public class SummaryPathIndex {
   public final String resourceType;
@@ -73,31 +75,18 @@ public class SummaryPathIndex {
           continue;
         }
         if (ed.getIsSummary()) {
-          addWithAncestors(summary, path);
+          summary.add(path);
         }
         if (ed.getMin() > 0) {
-          addWithAncestors(mandatory, path);
+          mandatory.add(path);
         }
       }
     }
     Set<String> text = new HashSet<>();
-    text.add(resourceType);
     text.add(resourceType + ".id");
     text.add(resourceType + ".meta");
     text.add(resourceType + ".text");
     text.addAll(mandatory);
     return new SummaryPathIndex(resourceType, summary, mandatory, text);
-  }
-
-  private static void addWithAncestors(Set<String> set, String path) {
-    int idx = path.length();
-    while (idx > 0) {
-      set.add(path.substring(0, idx));
-      int dot = path.lastIndexOf('.', idx - 1);
-      if (dot < 0) {
-        break;
-      }
-      idx = dot;
-    }
   }
 }
