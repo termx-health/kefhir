@@ -15,6 +15,7 @@ import com.kodality.kefhir.core.service.resource.ResourceSearchService;
 import com.kodality.kefhir.core.service.resource.ResourceService;
 import com.kodality.kefhir.core.util.DateUtil;
 import com.kodality.kefhir.core.util.ResourceUtil;
+import com.kodality.kefhir.core.context.RequestSummaryContext;
 import com.kodality.kefhir.core.util.SummaryProcessor;
 import com.kodality.kefhir.rest.model.KefhirRequest;
 import com.kodality.kefhir.rest.model.KefhirResponse;
@@ -65,25 +66,41 @@ public class DefaultFhirResourceServer extends BaseFhirResourceServer {
   @Override
   public KefhirResponse read(KefhirRequest req) {
     String resourceId = req.getPath();
-    ResourceVersion version = resourceService.load(new VersionId(req.getType(), resourceId));
-    if (version.isDeleted()) {
-      return new KefhirResponse(410).header("ETag", version.getETag());
+    // Surface the request's _summary to storage so it can skip expensive loads when the
+    // response will be summarised anyway (e.g. CodeSystemResourceStorage skips loading
+    // ~100 000 concept rows for ?_summary=true). Cleared in finally so the thread-local
+    // never outlives the request.
+    SummaryProcessor.Mode mode = readSummaryMode(req);
+    RequestSummaryContext.set(mode);
+    try {
+      ResourceVersion version = resourceService.load(new VersionId(req.getType(), resourceId));
+      if (version.isDeleted()) {
+        return new KefhirResponse(410).header("ETag", version.getETag());
+      }
+      return new KefhirResponse(200, applySummary(version.getContent(), req))
+          .header("Content-Location", uri(version, req))
+          .header("Last-Modified", DateUtil.format(version.getModified(), DateUtil.ISO_DATETIME))
+          .header("ETag", version.getETag());
+    } finally {
+      RequestSummaryContext.clear();
     }
-    return new KefhirResponse(200, applySummary(version.getContent(), req))
-        .header("Content-Location", uri(version, req))
-        .header("Last-Modified", DateUtil.format(version.getModified(), DateUtil.ISO_DATETIME))
-        .header("ETag", version.getETag());
   }
 
   @Override
   public KefhirResponse vread(KefhirRequest req) {
-    ResourceVersion version = resourceService.load(req.getReference());
-    if (version.isDeleted()) {
-      return new KefhirResponse(410).header("ETag", version.getETag());
+    SummaryProcessor.Mode mode = readSummaryMode(req);
+    RequestSummaryContext.set(mode);
+    try {
+      ResourceVersion version = resourceService.load(req.getReference());
+      if (version.isDeleted()) {
+        return new KefhirResponse(410).header("ETag", version.getETag());
+      }
+      return new KefhirResponse(200, applySummary(version.getContent(), req))
+          .header("Last-Modified", DateUtil.format(version.getModified(), DateUtil.ISO_DATETIME))
+          .header("ETag", version.getETag());
+    } finally {
+      RequestSummaryContext.clear();
     }
-    return new KefhirResponse(200, applySummary(version.getContent(), req))
-        .header("Last-Modified", DateUtil.format(version.getModified(), DateUtil.ISO_DATETIME))
-        .header("ETag", version.getETag());
   }
 
   private static ResourceContent applySummary(ResourceContent content, KefhirRequest req) {
