@@ -42,6 +42,7 @@ import io.micronaut.http.context.ServerRequestContext;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import jakarta.inject.Singleton;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
@@ -53,7 +54,9 @@ import org.hl7.fhir.r5.model.Bundle.HTTPVerb;
 import org.hl7.fhir.r5.model.Bundle.LinkRelationTypes;
 import org.hl7.fhir.r5.model.Extension;
 import org.hl7.fhir.r5.model.OperationOutcome;
+import org.hl7.fhir.r5.model.OperationOutcome.IssueSeverity;
 import org.hl7.fhir.r5.model.OperationOutcome.IssueType;
+import org.hl7.fhir.r5.model.OperationOutcome.OperationOutcomeIssueComponent;
 import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.r5.model.UriType;
 
@@ -110,19 +113,24 @@ public class BundleService implements BundleSaveHandler {
       try {
         responseBundle.addEntry(perform(entry, prefer));
       } catch (Exception e) {
+        // Batch entries are independent: a failure in one entry must NOT abort the whole batch.
+        // A FhirException maps to its declared status + issues; ANY other exception (e.g. a security
+        // ForbiddenException, NPE, DB error) becomes a 500 OperationOutcome entry too, instead of
+        // being rethrown — which previously turned the entire POST /fhir into a 500.
         FhirException fhirException = findFhirException(e);
-        if (fhirException != null) {
-          BundleEntryResponseComponent responseEntry = new BundleEntryResponseComponent();
-          responseEntry.setStatus("" + fhirException.getStatusCode());
-          BundleEntryComponent responseBundleEntry = responseBundle.addEntry();
-          responseBundleEntry.addLink().setRelation(LinkRelationTypes.ALTERNATE).setUrl(entry.getFullUrl());
-          OperationOutcome outcome = new OperationOutcome();
-          outcome.setIssue(fhirException.getIssues());
-          responseBundleEntry.setResource(outcome);
-          responseBundleEntry.setResponse(responseEntry);
-          return;
-        }
-        throw new RuntimeException("entry: " + entry.getFullUrl(), e);
+        int status = fhirException != null ? fhirException.getStatusCode() : 500;
+        List<OperationOutcomeIssueComponent> issues = fhirException != null
+            ? fhirException.getIssues()
+            : List.of(new OperationOutcomeIssueComponent()
+                .setSeverity(IssueSeverity.ERROR)
+                .setCode(IssueType.EXCEPTION)
+                .setDiagnostics(e.getMessage()));
+        BundleEntryComponent responseBundleEntry = responseBundle.addEntry();
+        responseBundleEntry.addLink().setRelation(LinkRelationTypes.ALTERNATE).setUrl(entry.getFullUrl());
+        OperationOutcome outcome = new OperationOutcome();
+        outcome.setIssue(issues);
+        responseBundleEntry.setResource(outcome);
+        responseBundleEntry.setResponse(new BundleEntryResponseComponent().setStatus("" + status));
       }
     });
     responseBundle.setType(BundleType.BATCHRESPONSE);
