@@ -118,7 +118,7 @@ public class BundleService implements BundleSaveHandler {
         // ForbiddenException, NPE, DB error) becomes a 500 OperationOutcome entry too, instead of
         // being rethrown — which previously turned the entire POST /fhir into a 500.
         FhirException fhirException = findFhirException(e);
-        int status = fhirException != null ? fhirException.getStatusCode() : 500;
+        int status = fhirException != null ? fhirException.getStatusCode() : resolveHttpStatus(e);
         List<OperationOutcomeIssueComponent> issues = fhirException != null
             ? fhirException.getIssues()
             : List.of(new OperationOutcomeIssueComponent()
@@ -226,6 +226,27 @@ public class BundleService implements BundleSaveHandler {
       return resp.getHeader("Location");
     }
     return null;
+  }
+
+  /**
+   * Best-effort HTTP status for a non-{@link FhirException} thrown by an entry. kefhir doesn't depend
+   * on the host app's exception types, so we read an {@code int getHttpStatus()} reflectively if the
+   * exception (or a cause) exposes one — e.g. kodality-commons {@code ApiException}/{@code
+   * ForbiddenException} carry it, so a forbidden entry comes back as 403 rather than a blanket 500.
+   * Falls back to 500.
+   */
+  private static int resolveHttpStatus(Throwable e) {
+    for (Throwable t = e; t != null && t != t.getCause(); t = t.getCause()) {
+      try {
+        Object status = t.getClass().getMethod("getHttpStatus").invoke(t);
+        if (status instanceof Integer code && code > 0) {
+          return code;
+        }
+      } catch (ReflectiveOperationException ignored) {
+        // no getHttpStatus() on this throwable — keep walking the cause chain
+      }
+    }
+    return 500;
   }
 
   private FhirException findFhirException(Throwable e) {
