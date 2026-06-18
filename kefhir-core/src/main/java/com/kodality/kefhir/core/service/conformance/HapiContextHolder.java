@@ -56,6 +56,13 @@ public class HapiContextHolder implements ConformanceUpdateListener {
   protected FhirValidator validator;
   protected final List<HapiValidationSupportProvider> validationSupportProviders;
 
+  // A terminology server is itself the terminology authority and validates codes through its own operations
+  // ($validate-code/$expand). Strict terminology checks during inbound profile validation reject resources
+  // that reference code systems the server doesn't host in its validation context (e.g. a passed-in
+  // tx-resource carrying CodeSystem.versionAlgorithm) — so deployments can disable them here.
+  @io.micronaut.context.annotation.Value("${kefhir.validation.no-terminology-checks:false}")
+  protected boolean noTerminologyChecks;
+
   public IWorkerContext getHapiContext() {
     return hapiContext;
   }
@@ -81,7 +88,9 @@ public class HapiContextHolder implements ConformanceUpdateListener {
     context.setValidationSupport(validationSupport);
 
     validator = context.newValidator();
-    validator.registerValidatorModule(new FhirInstanceValidator(validationSupport));
+    FhirInstanceValidator instanceValidator = new FhirInstanceValidator(validationSupport);
+    instanceValidator.setNoTerminologyChecks(noTerminologyChecks);
+    validator.registerValidatorModule(instanceValidator);
     preloadHapi();
   }
 
