@@ -63,6 +63,9 @@ public class BundleUtil {
         bundle.addEntry(e);
       });
     }
+    if (search.getIssues() != null) {
+      bundle.setIssues(ResourceFormatService.get().parse(search.getIssues().getValue()));
+    }
     return bundle;
   }
 
@@ -79,13 +82,14 @@ public class BundleUtil {
       bundle.addEntry(entry);
       if (bundleType == BundleType.HISTORY) {
         BundleEntryRequestComponent request = new BundleEntryRequestComponent();
-        request.setMethod(calcMethod(v));
+        HTTPVerb httpVerb = calcMethod(v);
+        request.setMethod(httpVerb);
         request.setUrl(v.getId().getResourceReference());
         entry.setRequest(request);
 
         BundleEntryResponseComponent response = new BundleEntryResponseComponent();
         response.setLastModified(v.getModified());
-        response.setStatus("200");//this is stupid
+        response.setStatus(calcStatusCode(httpVerb));
         entry.setResponse(response);
       }
     });
@@ -122,5 +126,13 @@ public class BundleUtil {
   private static HTTPVerb calcMethod(ResourceVersion version) {
     //XXX: this is NOT how it should be. need to somehow save action maybe? stupid
     return version.isDeleted() ? HTTPVerb.DELETE : version.getId().getVersion() == 1 ? HTTPVerb.POST : HTTPVerb.PUT;
+  }
+
+  private static String calcStatusCode(HTTPVerb httpVerb) {
+    return switch (httpVerb) {
+      case DELETE -> "204";
+      case POST -> "201";
+      default -> "200";
+    };
   }
 }

@@ -24,6 +24,9 @@
  package com.kodality.kefhir.core.util;
 
 import com.kodality.kefhir.core.model.VersionId;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
 
@@ -33,6 +36,13 @@ public final class ResourceUtil {
 
   private ResourceUtil() {
     // no init
+  }
+
+  /** De-duplicates a list of VersionId by their string reference, preserving order — a referenced resource
+   *  reachable through several entries must be loaded (and returned) only once (e.g. _include targets). */
+  public static List<VersionId> filterUnique(List<VersionId> versions) {
+    Set<String> seen = new HashSet<>();
+    return versions.stream().filter(version -> seen.add(version.getReference())).toList();
   }
 
   public static VersionId parseReference(String uri) {

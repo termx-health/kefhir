@@ -135,7 +135,7 @@ public class ResourceSearchService {
               .filter(reference -> !contains(result, reference))
               .forEach(resourceIds::add)
           );
-      result.addIncludes(storageService.load(resourceIds));
+      result.addIncludes(storageService.load(ResourceUtil.filterUnique(resourceIds)));
     }));
   }
 

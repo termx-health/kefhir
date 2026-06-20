@@ -23,16 +23,20 @@
  */
 package com.kodality.kefhir.rest;
 
+import com.kodality.kefhir.core.exception.FhirException;
 import com.kodality.kefhir.core.exception.FhirServerException;
 import com.kodality.kefhir.core.model.ResourceVersion;
 import com.kodality.kefhir.core.model.search.HistorySearchCriterion;
 import com.kodality.kefhir.core.service.conformance.ConformanceHolder;
+import com.kodality.kefhir.core.service.resource.ResourceOperationService;
 import com.kodality.kefhir.core.service.resource.ResourceService;
 import com.kodality.kefhir.rest.bundle.BundleSaveHandler;
 import com.kodality.kefhir.rest.interaction.FhirInteraction;
 import com.kodality.kefhir.rest.model.KefhirRequest;
 import com.kodality.kefhir.rest.model.KefhirResponse;
+import com.kodality.kefhir.rest.operation.OperationParametersReader;
 import com.kodality.kefhir.rest.util.BundleUtil;
+import com.kodality.kefhir.structure.api.ResourceContent;
 import com.kodality.kefhir.structure.service.ResourceFormatService;
 import jakarta.inject.Provider;
 import java.util.List;
@@ -44,9 +48,11 @@ import org.hl7.fhir.r5.model.Bundle;
 import org.hl7.fhir.r5.model.Bundle.BundleType;
 import org.hl7.fhir.r5.model.CodeableConcept;
 import org.hl7.fhir.r5.model.OperationOutcome;
+import org.hl7.fhir.r5.model.OperationOutcome.IssueType;
 
 import static com.kodality.kefhir.core.model.InteractionType.CONFORMANCE;
 import static com.kodality.kefhir.core.model.InteractionType.HISTORYSYSTEM;
+import static com.kodality.kefhir.core.model.InteractionType.OPERATION;
 import static com.kodality.kefhir.core.model.InteractionType.SEARCHSYSTEM;
 import static com.kodality.kefhir.core.model.InteractionType.TRANSACTION;
 
@@ -58,6 +64,8 @@ public class FhirRootServer {
   private final ResourceFormatService resourceFormatService;
   private final ResourceService resourceService;
   private final Provider<BundleSaveHandler> bundleService;
+  private final ResourceOperationService resourceOperationService;
+  private final OperationParametersReader operationParametersReader;
 
   @FhirInteraction(interaction = CONFORMANCE, mapping = "GET /metadata")
   public KefhirResponse conformance(KefhirRequest req) {
@@ -97,6 +105,22 @@ public class FhirRootServer {
     OperationOutcome op = new OperationOutcome();
     op.addIssue().setDetails(new CodeableConcept().setText("Welcome to Kefhir"));
     return new KefhirResponse(200, op);
+  }
+
+  @FhirInteraction(interaction = OPERATION, mapping = "GET /${}")
+  public KefhirResponse baseOperation(KefhirRequest req) {
+    String operation = req.getPath();
+    if (!operation.startsWith("$")) {
+      throw new FhirException(400, IssueType.INVALID, "operation must start with $");
+    }
+    ResourceContent content = operationParametersReader.readOperationParameters(operation, req);
+    ResourceContent response = resourceOperationService.runBaseOperation(operation, req.getType(), content);
+    return new KefhirResponse(200, response);
+  }
+
+  @FhirInteraction(interaction = OPERATION, mapping = "POST /${}")
+  public KefhirResponse baseOperation_(KefhirRequest req) {
+    return baseOperation(req);
   }
 
 }

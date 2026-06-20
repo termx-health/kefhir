@@ -19,9 +19,9 @@ import com.kodality.kefhir.core.context.RequestSummaryContext;
 import com.kodality.kefhir.core.util.SummaryProcessor;
 import com.kodality.kefhir.rest.model.KefhirRequest;
 import com.kodality.kefhir.rest.model.KefhirResponse;
+import com.kodality.kefhir.rest.operation.OperationParametersReader;
 import com.kodality.kefhir.rest.util.BundleUtil;
 import com.kodality.kefhir.structure.api.ResourceContent;
-import com.kodality.kefhir.structure.service.ResourceFormatService;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
@@ -34,15 +34,7 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.hl7.fhir.r5.model.Bundle;
 import org.hl7.fhir.r5.model.Bundle.BundleType;
 import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestResourceComponent;
-import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestResourceOperationComponent;
-import org.hl7.fhir.r5.model.Enumerations.FHIRTypes;
-import org.hl7.fhir.r5.model.Enumerations.OperationParameterUse;
-import org.hl7.fhir.r5.model.OperationDefinition;
-import org.hl7.fhir.r5.model.OperationDefinition.OperationDefinitionParameterComponent;
 import org.hl7.fhir.r5.model.OperationOutcome.IssueType;
-import org.hl7.fhir.r5.model.Parameters;
-import org.hl7.fhir.r5.model.Resource;
-import org.hl7.fhir.r5.model.ResourceType;
 
 @Slf4j
 @Named("default")
@@ -54,7 +46,7 @@ public class DefaultFhirResourceServer extends BaseFhirResourceServer {
   @Inject
   protected ResourceSearchService resourceSearchService;
   @Inject
-  protected ResourceFormatService resourceFormatService;
+  protected OperationParametersReader operationParametersReader;
   @Inject
   protected ResourceOperationService resourceOperationService;
 
@@ -168,6 +160,15 @@ public class DefaultFhirResourceServer extends BaseFhirResourceServer {
     // empty updateCreate = allowed. should remove this at some point. added for backwards compatilibility, when this setting did not exists
   }
 
+  /** Whether a resource exists, irrespective of delete-status — uses the _id search index when available,
+   *  else a direct load. Deliberately not load()-based, so a deleted resource still counts as existing. */
+  protected boolean exists(String type, String id) {
+    if (ConformanceHolder.getSearchParam(type, "_id") == null) {
+      return !resourceService.load(List.of(new VersionId(type, id))).isEmpty();
+    }
+    return resourceSearchService.search(type, "_id", id, "_count", "0").getTotal() > 0;
+  }
+
   @Override
   public KefhirResponse conditionalUpdate(KefhirRequest req) {
     if (req.getParameters().isEmpty()) {
@@ -192,8 +193,9 @@ public class DefaultFhirResourceServer extends BaseFhirResourceServer {
   @Override
   public KefhirResponse history(KefhirRequest req) {
     VersionId id = req.getReference();
-    ResourceVersion version = resourceService.load(id);
-    if (version == null) {
+    // Use an existence check that ignores delete-status (rather than load(), which returns null for a deleted
+    // resource) — a DELETED resource still has a retrievable _history (the delete event included), per the spec.
+    if (!exists(req.getType(), id.getResourceId())) {
       throw new FhirException(404, IssueType.NOTFOUND, req.getType() + "/" + id.getResourceId() + " not found");
     }
     HistorySearchCriterion criteria = new HistorySearchCriterion(id.getResourceType(), id.getResourceId());
@@ -272,7 +274,7 @@ public class DefaultFhirResourceServer extends BaseFhirResourceServer {
     }
     ResourceId id = new ResourceId(req.getType(), resourceId);
 
-    ResourceContent content = readOperationParameters(operation, req);
+    ResourceContent content = operationParametersReader.readOperationParameters(operation, req);
     ResourceContent response = resourceOperationService.runInstanceOperation(operation, id, content);
     return new KefhirResponse(200, response);
   }
@@ -288,54 +290,9 @@ public class DefaultFhirResourceServer extends BaseFhirResourceServer {
     if (!operation.startsWith("$")) {
       throw new FhirException(400, IssueType.INVALID, "operation must start with $");
     }
-    ResourceContent content = readOperationParameters(operation, req);
+    ResourceContent content = operationParametersReader.readOperationParameters(operation, req);
     ResourceContent response = resourceOperationService.runTypeOperation(operation, req.getType(), content);
     return new KefhirResponse(200, response);
-  }
-
-  private ResourceContent readOperationParameters(String operation, KefhirRequest req) {
-    OperationDefinition opDef = findOperationDefinition(operation, req);
-
-    if (req.getMethod().equals("GET")) {
-      if (opDef.getAffectsState()) {
-        throw new FhirException(400, IssueType.INVALID, "Performing an state affecting operation using GET not allowed");
-      }
-      Parameters parameters = new Parameters();
-      req.getParameters().forEach((k, v) -> parameters.addParameter(k, String.join(",", v)));
-      return resourceFormatService.compose(parameters, "json");
-    }
-
-    Resource body = req.getBody() == null ? null : resourceFormatService.parse(req.getBody());
-    if (body != null && body.getResourceType() == ResourceType.Parameters) {
-      return new ResourceContent(req.getBody(), req.getContentTypeName());
-    }
-
-    List<OperationDefinitionParameterComponent> resourceParams =
-        opDef.getParameter().stream().filter(p -> p.getUse() == OperationParameterUse.IN && p.getType() == FHIRTypes.RESOURCE).toList();
-    if (body == null && !resourceParams.isEmpty()) {
-      throw new FhirException(400, IssueType.INVALID, "Operation body required");
-    }
-    if (body != null && resourceParams.size() != 1) {
-      throw new FhirException(400, IssueType.INVALID,
-          "Operation MAY accept Resource in body only if operation definition has exactly one input parameter whose type is a FHIR Resource");
-    }
-    String resourceParameterName = resourceParams.get(0).getName();
-
-    Parameters parameters = new Parameters();
-    req.getParameters().forEach((k, v) -> parameters.addParameter(k, String.join(",", v)));
-    parameters.addParameter().setName(resourceParameterName).setResource(body);
-    return resourceFormatService.compose(parameters, req.getContentTypeName());
-  }
-
-  private static OperationDefinition findOperationDefinition(String operation, KefhirRequest req) {
-    CapabilityStatementRestResourceOperationComponent capabilityOp = ConformanceHolder
-        .getCapabilityResource(req.getType()).getOperation().stream().filter(op -> ("$" + op.getName()).equals(operation)).findFirst()
-        .orElseThrow(() -> new FhirException(400, IssueType.INVALID, "Operation " + operation + " not defined in capability statement"));
-    OperationDefinition opDef = ConformanceHolder.getOperationDefinition(capabilityOp.getDefinition());
-    if (opDef == null) {
-      throw new FhirException(400, IssueType.INVALID, "Operation " + operation + " not defined");
-    }
-    return opDef;
   }
 
   @Override

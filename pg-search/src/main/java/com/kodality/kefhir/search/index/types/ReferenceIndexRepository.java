@@ -26,6 +26,7 @@ package com.kodality.kefhir.search.index.types;
 import com.kodality.kefhir.search.index.TypeIndexRepository;
 import com.kodality.kefhir.search.index.types.ReferenceIndexRepository.Value;
 import com.kodality.kefhir.util.sql.SqlBuilder;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -34,7 +35,6 @@ import jakarta.inject.Singleton;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringUtils;
 
 import static java.util.stream.Collectors.joining;
 
@@ -49,16 +49,17 @@ public class ReferenceIndexRepository extends TypeIndexRepository<Value> {
 
   @Override
   public Stream<Value> map(Object value, String valueType) {
-    return getValue((Map) value, valueType).filter(v -> v != null && v.getId() != null);
+    return getValue(value, valueType).filter(v -> v != null && v.getId() != null);
   }
 
-  private Stream<Value> getValue(Map value, String valueType) {
+  private Stream<Value> getValue(Object value, String valueType) {
     switch (valueType) {
+      case "canonical":
+      case "uri":
+        return Stream.of(parseUri((String) value));
       case "Reference":
-        String v = (String) value.get("reference");
-        String type = StringUtils.contains(v, "/") ? StringUtils.substringBefore(v, "/") : null;
-        String id = StringUtils.contains(v, "/") ? StringUtils.substringAfter(v, "/") : v;
-        return Stream.of(new Value(type, id));
+        String v = (String) ((Map) value).get("reference");
+        return Stream.of(parseUri(v));
       case "Attachment":
         return Stream.empty(); //do nothing
       default:
@@ -66,22 +67,32 @@ public class ReferenceIndexRepository extends TypeIndexRepository<Value> {
     }
   }
 
+  public static Value parseUri(String v) {
+    String[] tokens = v.split("/");
+    return new Value(
+        tokens.length > 2 ? String.join("/", Arrays.copyOf(tokens, tokens.length - 2)) : null,
+        tokens.length > 1 ? tokens[tokens.length - 2] : null,
+        tokens[tokens.length - 1]
+    );
+  }
+
   @Override
   protected String fields() {
-    return "type_id, id";
+    return "base, type_id, id";
   }
 
   @Override
   protected SqlBuilder withValues(List<Value> values) {
     SqlBuilder sb = new SqlBuilder();
-    sb.append(values.stream().map(e -> "(search.resource_type_id(?), ?)").collect(joining(",")));
-    sb.add(values.stream().flatMap(v -> Stream.of(v.getType(), v.getId())).collect(Collectors.toList()));
+    sb.append(values.stream().map(e -> "(?, search.resource_type_id(?), ?)").collect(joining(",")));
+    sb.add(values.stream().flatMap(v -> Stream.of(v.getBase(), v.getType(), v.getId())).collect(Collectors.toList()));
     return sb;
   }
 
   @Getter
   @AllArgsConstructor
   public static class Value {
+    private String base;
     private String type;
     private String id;
   }

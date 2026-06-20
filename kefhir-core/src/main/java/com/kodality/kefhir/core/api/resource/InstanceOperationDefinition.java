@@ -26,11 +26,12 @@
 import com.kodality.kefhir.core.model.ResourceId;
 import com.kodality.kefhir.structure.api.ResourceContent;
 
-public interface InstanceOperationDefinition extends BaseOperationDefinition {
+public interface InstanceOperationDefinition extends OperationDefinition {
 
+  /**
+   * @return FHIR resource type this operation is applied to
+   */
   String getResourceType();
-
-  String getOperationName();
 
   /**
    * @return Parameters or Resource

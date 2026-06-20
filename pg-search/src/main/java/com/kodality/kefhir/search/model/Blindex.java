@@ -36,6 +36,7 @@ public class Blindex {
   private String path;
   private String name;
   private String paramType;
+  private boolean fhirPath;
 
   public Blindex(String paramType, String resourceType, String path) {
     this.resourceType = resourceType;

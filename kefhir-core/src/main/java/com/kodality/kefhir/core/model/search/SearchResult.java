@@ -26,6 +26,7 @@ package com.kodality.kefhir.core.model.search;
 import com.kodality.kefhir.core.model.ResourceId;
 import com.kodality.kefhir.core.model.ResourceVersion;
 import com.kodality.kefhir.core.model.VersionId;
+import com.kodality.kefhir.structure.api.ResourceContent;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -36,6 +37,8 @@ public class SearchResult {
   private Integer total;
   private List<ResourceVersion> entries;
   private final List<ResourceVersion> includes = new ArrayList<>();
+  // Optional OperationOutcome to surface in Bundle.issues (e.g. search warnings); null = none.
+  private ResourceContent issues;
 
   public SearchResult() {
     this(0, new ArrayList<>());
@@ -84,6 +87,14 @@ public class SearchResult {
 
   public void addIncludes(List<ResourceVersion> includes) {
     this.includes.addAll(includes);
+  }
+
+  public ResourceContent getIssues() {
+    return issues;
+  }
+
+  public void setIssues(ResourceContent issues) {
+    this.issues = issues;
   }
 
 }
