@@ -23,6 +23,7 @@
  */
  package com.kodality.kefhir.core.service.resource;
 
+import com.kodality.kefhir.core.api.resource.BaseOperationDefinition;
 import com.kodality.kefhir.core.api.resource.InstanceOperationDefinition;
 import com.kodality.kefhir.core.api.resource.OperationInterceptor;
 import com.kodality.kefhir.core.api.resource.TypeOperationDefinition;
@@ -39,6 +40,7 @@ import org.hl7.fhir.r5.model.OperationOutcome.IssueType;
 public class ResourceOperationService {
   private final List<InstanceOperationDefinition> instanceOperations;
   private final List<TypeOperationDefinition> typeOperations;
+  private final List<BaseOperationDefinition> baseOperations;
   private final List<OperationInterceptor> interceptors;
 
   public ResourceContent runInstanceOperation(String operation, ResourceId id, ResourceContent parameters) {
@@ -56,6 +58,15 @@ public class ResourceOperationService {
     return typeOperations.stream()
         .filter(op -> operation.equals("$" + op.getOperationName()))
         .filter(op -> op.getResourceType().equals(type))
+        .findFirst()
+        .orElseThrow(() -> new FhirException(404, IssueType.NOTFOUND, "operation " + operation + " not found"))
+        .run(parameters);
+  }
+
+  public ResourceContent runBaseOperation(String operation, String type, ResourceContent parameters) {
+    interceptors.forEach(i -> i.handle("base", operation, parameters));
+    return baseOperations.stream()
+        .filter(op -> operation.equals("$" + op.getOperationName()))
         .findFirst()
         .orElseThrow(() -> new FhirException(404, IssueType.NOTFOUND, "operation " + operation + " not found"))
         .run(parameters);

@@ -24,8 +24,8 @@
 package com.kodality.kefhir.rest;
 
 import com.kodality.kefhir.core.api.conformance.ConformanceUpdateListener;
-import com.kodality.kefhir.core.api.resource.BaseOperationDefinition;
 import com.kodality.kefhir.core.api.resource.InstanceOperationDefinition;
+import com.kodality.kefhir.core.api.resource.OperationDefinition;
 import com.kodality.kefhir.core.api.resource.TypeOperationDefinition;
 import com.kodality.kefhir.core.model.InteractionType;
 import com.kodality.kefhir.core.service.conformance.ConformanceHolder;
@@ -47,7 +47,6 @@ import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestResource
 import org.hl7.fhir.r5.model.CapabilityStatement.ResourceVersionPolicy;
 import org.hl7.fhir.r5.model.CapabilityStatement.RestfulCapabilityMode;
 import org.hl7.fhir.r5.model.CapabilityStatement.SystemRestfulInteraction;
-import org.hl7.fhir.r5.model.OperationDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition;
 
 import static java.util.Arrays.asList;
@@ -62,7 +61,8 @@ public class KefhirEndpointInitializer implements ConformanceUpdateListener {
   private final DefaultFhirResourceServer defaultResourceServer;
   private final FhirRootServer rootServer;
 
-  private final List<BaseOperationDefinition> operations;
+  private final List<TypeOperationDefinition> typeOperations;
+  private final List<InstanceOperationDefinition> instanceOperations;
 
   private CapabilityStatement capability;
 
@@ -125,13 +125,14 @@ public class KefhirEndpointInitializer implements ConformanceUpdateListener {
   }
 
   private void prepareOperationsForResource(CapabilityStatementRestResourceComponent r) {
-    Map<String, List<BaseOperationDefinition>> opsByName = operations.stream()
-        .filter(o -> o.getResourceType().equals(r.getType()))
-        .collect(Collectors.groupingBy(BaseOperationDefinition::getOperationName));
+    Map<String, List<OperationDefinition>> opsByName = Stream.concat(
+        instanceOperations.stream().filter(o -> o.getResourceType().equals(r.getType())),
+        typeOperations.stream().filter(o -> o.getResourceType().equals(r.getType()))
+    ).collect(Collectors.groupingBy(OperationDefinition::getOperationName));
 
     r.setOperation(r.getOperation().stream().filter(operationComponent -> {
-      OperationDefinition operationDefinition = ConformanceHolder.getOperationDefinition(operationComponent.getDefinition());
-      List<BaseOperationDefinition> implementations = opsByName.getOrDefault(operationComponent.getName(), List.of());
+      org.hl7.fhir.r5.model.OperationDefinition operationDefinition = ConformanceHolder.getOperationDefinition(operationComponent.getDefinition());
+      List<OperationDefinition> implementations = opsByName.getOrDefault(operationComponent.getName(), List.of());
       opsByName.remove(operationComponent.getName());
       return validateOperation(r.getType(), operationComponent, operationDefinition, implementations);
     }).toList());
@@ -144,8 +145,8 @@ public class KefhirEndpointInitializer implements ConformanceUpdateListener {
   private boolean validateOperation(
       String resourceType,
       CapabilityStatementRestResourceOperationComponent operationComponent,
-      OperationDefinition operationDefinition,
-      List<BaseOperationDefinition> impls
+      org.hl7.fhir.r5.model.OperationDefinition operationDefinition,
+      List<OperationDefinition> impls
   ) {
     if (operationDefinition == null) {
       log.error("Missing OperationDefinition for referenced in CapabilityStatement operation {} for resource {}",
@@ -155,7 +156,7 @@ public class KefhirEndpointInitializer implements ConformanceUpdateListener {
 
     boolean validType = true;
     if (operationDefinition.getType()) {
-      List<BaseOperationDefinition> typeImpls = impls.stream()
+      List<OperationDefinition> typeImpls = impls.stream()
           .filter(TypeOperationDefinition.class::isInstance)
           .toList();
       validType = validateOperation(typeImpls, operationComponent.getDefinition(), resourceType);
@@ -163,7 +164,7 @@ public class KefhirEndpointInitializer implements ConformanceUpdateListener {
 
     boolean validInstance = true;
     if (operationDefinition.getInstance()) {
-      List<BaseOperationDefinition> instanceImpls = impls.stream()
+      List<OperationDefinition> instanceImpls = impls.stream()
           .filter(InstanceOperationDefinition.class::isInstance)
           .toList();
       validInstance = validateOperation(instanceImpls, operationComponent.getDefinition(), resourceType);
@@ -172,7 +173,7 @@ public class KefhirEndpointInitializer implements ConformanceUpdateListener {
     return validType && validInstance;
   }
 
-  private boolean validateOperation(List<BaseOperationDefinition> implTypes, String opName, String resourceType) {
+  private boolean validateOperation(List<OperationDefinition> implTypes, String opName, String resourceType) {
     if (implTypes.isEmpty()) {
       log.error("Cannot find implementation for declared in capability statement operation '{}'", opName);
       return false;

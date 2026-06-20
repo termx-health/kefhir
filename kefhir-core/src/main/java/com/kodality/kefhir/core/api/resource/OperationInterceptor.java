@@ -27,7 +27,7 @@ import com.kodality.kefhir.structure.api.ResourceContent;
 
 public interface OperationInterceptor {
   /**
-   * @param level instance | type | ...
+   * @param level instance | type | base
    */
   void handle(String level, String operation, ResourceContent parameters);
 }

@@ -23,16 +23,9 @@
  */
  package com.kodality.kefhir.core.api.resource;
 
-import com.kodality.kefhir.structure.api.ResourceContent;
-
-public interface TypeOperationDefinition extends OperationDefinition {
+public interface OperationDefinition {
   /**
-   * @return FHIR resource type this operation is applied to
+   * @return Name of the operation, as in url, without prefix '$'.
    */
-  String getResourceType();
-
-  /**
-   * @return Parameters or Resource
-   */
-  ResourceContent run(ResourceContent parameters);
+  String getOperationName();
 }
