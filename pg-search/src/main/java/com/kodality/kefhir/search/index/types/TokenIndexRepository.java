@@ -58,7 +58,11 @@ public class TokenIndexRepository extends TypeIndexRepository<Value> {
         return Stream.of(new Value(null, (String) value));
       case "boolean":
         return Stream.of(new Value(null, ((Boolean) value).toString()));
-      case "Coding":
+      case "Coding": {
+        // A Coding carries its token in `code` (with `system`); Identifier/ContactPoint use `value`.
+        Map cv = (Map) value;
+        return Stream.of(new Value((String) cv.get("system"), (String) cv.get("code")));
+      }
       case "Identifier":
       case "ContactPoint":
         Map obj = (Map) value;

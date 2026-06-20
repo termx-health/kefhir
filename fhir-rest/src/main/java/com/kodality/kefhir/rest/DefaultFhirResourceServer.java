@@ -168,6 +168,15 @@ public class DefaultFhirResourceServer extends BaseFhirResourceServer {
     // empty updateCreate = allowed. should remove this at some point. added for backwards compatilibility, when this setting did not exists
   }
 
+  /** Whether a resource exists, irrespective of delete-status — uses the _id search index when available,
+   *  else a direct load. Deliberately not load()-based, so a deleted resource still counts as existing. */
+  protected boolean exists(String type, String id) {
+    if (ConformanceHolder.getSearchParam(type, "_id") == null) {
+      return !resourceService.load(List.of(new VersionId(type, id))).isEmpty();
+    }
+    return resourceSearchService.search(type, "_id", id, "_count", "0").getTotal() > 0;
+  }
+
   @Override
   public KefhirResponse conditionalUpdate(KefhirRequest req) {
     if (req.getParameters().isEmpty()) {
@@ -192,8 +201,9 @@ public class DefaultFhirResourceServer extends BaseFhirResourceServer {
   @Override
   public KefhirResponse history(KefhirRequest req) {
     VersionId id = req.getReference();
-    ResourceVersion version = resourceService.load(id);
-    if (version == null) {
+    // Use an existence check that ignores delete-status (rather than load(), which returns null for a deleted
+    // resource) — a DELETED resource still has a retrievable _history (the delete event included), per the spec.
+    if (!exists(req.getType(), id.getResourceId())) {
       throw new FhirException(404, IssueType.NOTFOUND, req.getType() + "/" + id.getResourceId() + " not found");
     }
     HistorySearchCriterion criteria = new HistorySearchCriterion(id.getResourceType(), id.getResourceId());
