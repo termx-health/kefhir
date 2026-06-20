@@ -81,6 +81,11 @@ public class HapiContextHolder implements ConformanceUpdateListener {
   }
 
   @Override
+  public Integer getOrder() {
+    return 30;
+  }
+
+  @Override
   public void updated() {
     IValidationSupport validationSupport = getValidationSupport();
 

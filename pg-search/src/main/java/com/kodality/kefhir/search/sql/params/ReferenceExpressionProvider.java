@@ -26,6 +26,8 @@ package com.kodality.kefhir.search.sql.params;
 import com.kodality.kefhir.core.exception.FhirException;
 import com.kodality.kefhir.core.model.search.QueryParam;
 import com.kodality.kefhir.core.service.conformance.ConformanceHolder;
+import com.kodality.kefhir.search.index.types.ReferenceIndexRepository;
+import com.kodality.kefhir.search.index.types.ReferenceIndexRepository.Value;
 import com.kodality.kefhir.search.repository.ResourceStructureRepository;
 import com.kodality.kefhir.search.sql.SearchSqlUtil;
 import com.kodality.kefhir.search.util.SearchPathUtil;
@@ -52,8 +54,9 @@ public class ReferenceExpressionProvider extends DefaultExpressionProvider {
 
   @Override
   protected SqlBuilder makeCondition(QueryParam param, String v) {
-    String type = StringUtils.contains(v, "/") ? StringUtils.substringBefore(v, "/") : null;
-    String id = StringUtils.contains(v, "/") ? StringUtils.substringAfter(v, "/") : v;
+    Value value = ReferenceIndexRepository.parseUri(v);
+    String type = value.getType();
+    String id = value.getId();
     if (param.getModifier() != null) {
       if (type != null && !param.getModifier().equals(type)) {
         throw new FhirException(400, IssueType.INVALID, "invalid reference param " + param.getKey());
@@ -74,6 +77,11 @@ public class ReferenceExpressionProvider extends DefaultExpressionProvider {
     SqlBuilder sb = new SqlBuilder();
     sb.append("(");
     sb.append("i.id = ?", id);
+    if (value.getBase() == null) {
+      sb.append(" and i.base is null");
+    } else {
+      sb.append(" and i.base = ?", value.getBase());
+    }
     sb.appendIfNotNull(" and i.type_id = search.rt_id(?)", type);
     sb.append(")");
     return sb;
