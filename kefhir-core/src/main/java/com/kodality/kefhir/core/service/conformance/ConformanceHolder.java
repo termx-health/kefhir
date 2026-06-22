@@ -196,4 +196,40 @@ public class ConformanceHolder {
     return operationDefinitions == null ? null : operationDefinitions.get(url);
   }
 
+  /**
+   * Exposes an operation that has a server-side implementation but no pre-loaded {@link OperationDefinition} /
+   * CapabilityStatement entry: registers the (typically synthetic) OperationDefinition and adds a matching
+   * operation to the server's CapabilityStatement resource, so the operation passes the capability check and is
+   * invokable. Idempotent per (resourceType, operation code).
+   */
+  public static void registerImplementedOperation(String resourceType, OperationDefinition operationDefinition) {
+    if (operationDefinition == null || operationDefinition.getUrl() == null) {
+      return;
+    }
+    if (operationDefinitions == null) {
+      operationDefinitions = new HashMap<>();
+    }
+    operationDefinitions.putIfAbsent(operationDefinition.getUrl(), operationDefinition);
+    CapabilityStatementRestResourceComponent resource = getCapabilityResource(resourceType);
+    if (resource != null && resource.getOperation().stream().noneMatch(o -> operationDefinition.getCode().equals(o.getName()))) {
+      resource.addOperation().setName(operationDefinition.getCode()).setDefinition(operationDefinition.getUrl());
+    }
+  }
+
+  /** Like {@link #registerImplementedOperation} but for a server/system-level (base) operation: adds it to the REST-level operation list. */
+  public static void registerImplementedBaseOperation(OperationDefinition operationDefinition) {
+    if (operationDefinition == null || operationDefinition.getUrl() == null || getCapabilityStatement() == null) {
+      return;
+    }
+    if (operationDefinitions == null) {
+      operationDefinitions = new HashMap<>();
+    }
+    operationDefinitions.putIfAbsent(operationDefinition.getUrl(), operationDefinition);
+    getCapabilityStatement().getRest().stream().filter(r -> r.getMode() == RestfulCapabilityMode.SERVER).findFirst().ifPresent(rest -> {
+      if (rest.getOperation().stream().noneMatch(o -> operationDefinition.getCode().equals(o.getName()))) {
+        rest.addOperation().setName(operationDefinition.getCode()).setDefinition(operationDefinition.getUrl());
+      }
+    });
+  }
+
 }
