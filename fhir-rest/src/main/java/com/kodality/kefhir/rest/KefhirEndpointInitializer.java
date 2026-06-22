@@ -63,6 +63,7 @@ public class KefhirEndpointInitializer implements ConformanceUpdateListener {
 
   private final List<TypeOperationDefinition> typeOperations;
   private final List<InstanceOperationDefinition> instanceOperations;
+  private final List<com.kodality.kefhir.core.api.resource.BaseOperationDefinition> baseOperations;
 
   private CapabilityStatement capability;
 
@@ -106,6 +107,7 @@ public class KefhirEndpointInitializer implements ConformanceUpdateListener {
     });
     capabilityStatement.getRest().forEach(rest -> {
       prepareOperations(rest);
+      prepareBaseOperations(rest);
       List<String> interactions = asList("transaction", "batch", SystemRestfulInteraction.HISTORYSYSTEM.toCode());
       rest.setInteraction(rest.getInteraction()
           .stream()
@@ -130,16 +132,77 @@ public class KefhirEndpointInitializer implements ConformanceUpdateListener {
         typeOperations.stream().filter(o -> o.getResourceType().equals(r.getType()))
     ).collect(Collectors.groupingBy(OperationDefinition::getOperationName));
 
-    r.setOperation(r.getOperation().stream().filter(operationComponent -> {
-      org.hl7.fhir.r5.model.OperationDefinition operationDefinition = ConformanceHolder.getOperationDefinition(operationComponent.getDefinition());
-      List<OperationDefinition> implementations = opsByName.getOrDefault(operationComponent.getName(), List.of());
-      opsByName.remove(operationComponent.getName());
-      return validateOperation(r.getType(), operationComponent, operationDefinition, implementations);
-    }).toList());
+    List<CapabilityStatementRestResourceOperationComponent> operations =
+        new ArrayList<>(r.getOperation().stream().filter(operationComponent -> {
+          org.hl7.fhir.r5.model.OperationDefinition operationDefinition = ConformanceHolder.getOperationDefinition(operationComponent.getDefinition());
+          List<OperationDefinition> implementations = opsByName.getOrDefault(operationComponent.getName(), List.of());
+          opsByName.remove(operationComponent.getName());
+          return validateOperation(r.getType(), operationComponent, operationDefinition, implementations);
+        }).toList());
 
-    opsByName.entrySet().forEach(e ->
-        log.debug("Operation '{}' with implementation '{}' is present for resource {}, but it missing in CapabilityStatement", e.getKey(), e.getValue(), r.getType())
-    );
+    // Auto-expose operations that have a server-side implementation but no CapabilityStatement entry / loaded
+    // OperationDefinition: synthesize a minimal OperationDefinition, register it on the ConformanceHolder, and add
+    // the operation to this resource — so an operation only needs an implementation bean to become invokable.
+    opsByName.forEach((name, impls) -> {
+      org.hl7.fhir.r5.model.OperationDefinition od = synthesizeOperationDefinition(r.getType(), name, impls);
+      ConformanceHolder.registerImplementedOperation(r.getType(), od);
+      operations.add(new CapabilityStatementRestResourceOperationComponent().setName(name).setDefinition(od.getUrl()));
+      log.info("Auto-exposed implemented operation '${}' for resource {} (no CapabilityStatement entry)", name, r.getType());
+    });
+
+    r.setOperation(operations);
+  }
+
+  /** A minimal synthetic OperationDefinition for an implemented-but-undeclared operation (type/instance from the impls). */
+  private static org.hl7.fhir.r5.model.OperationDefinition synthesizeOperationDefinition(
+      String resourceType, String name, List<OperationDefinition> impls) {
+    org.hl7.fhir.r5.model.OperationDefinition od = new org.hl7.fhir.r5.model.OperationDefinition();
+    od.setUrl("urn:kefhir:operation:" + resourceType + "-" + name);
+    od.setName(name);
+    od.setCode(name);
+    od.setStatus(org.hl7.fhir.r5.model.Enumerations.PublicationStatus.ACTIVE);
+    od.setKind(org.hl7.fhir.r5.model.OperationDefinition.OperationKind.OPERATION);
+    od.setAffectsState(false);
+    od.setSystem(false);
+    od.setType(impls.stream().anyMatch(TypeOperationDefinition.class::isInstance));
+    od.setInstance(impls.stream().anyMatch(InstanceOperationDefinition.class::isInstance));
+    return od;
+  }
+
+  /**
+   * Auto-exposes server-level (BaseOperationDefinition) operations that have an implementation but no
+   * CapabilityStatement entry — the system-level counterpart of {@link #prepareOperationsForResource}. Adds them to
+   * the REST-level operation list so {@code POST /$op} resolves.
+   */
+  private void prepareBaseOperations(CapabilityStatementRestComponent rest) {
+    Set<String> existing = rest.getOperation().stream().map(CapabilityStatementRestResourceOperationComponent::getName).collect(java.util.stream.Collectors.toSet());
+    Map<String, List<OperationDefinition>> baseOpsByName = baseOperations.stream()
+        .collect(Collectors.groupingBy(OperationDefinition::getOperationName));
+    List<CapabilityStatementRestResourceOperationComponent> operations = new ArrayList<>(rest.getOperation());
+    baseOpsByName.forEach((name, impls) -> {
+      if (existing.contains(name)) {
+        return;
+      }
+      org.hl7.fhir.r5.model.OperationDefinition od = synthesizeBaseOperationDefinition(name);
+      ConformanceHolder.registerImplementedBaseOperation(od);
+      operations.add(new CapabilityStatementRestResourceOperationComponent().setName(name).setDefinition(od.getUrl()));
+      log.info("Auto-exposed implemented base operation '${}' (no CapabilityStatement entry)", name);
+    });
+    rest.setOperation(operations);
+  }
+
+  private static org.hl7.fhir.r5.model.OperationDefinition synthesizeBaseOperationDefinition(String name) {
+    org.hl7.fhir.r5.model.OperationDefinition od = new org.hl7.fhir.r5.model.OperationDefinition();
+    od.setUrl("urn:kefhir:operation:base-" + name);
+    od.setName(name);
+    od.setCode(name);
+    od.setStatus(org.hl7.fhir.r5.model.Enumerations.PublicationStatus.ACTIVE);
+    od.setKind(org.hl7.fhir.r5.model.OperationDefinition.OperationKind.OPERATION);
+    od.setAffectsState(false);
+    od.setSystem(true);
+    od.setType(false);
+    od.setInstance(false);
+    return od;
   }
 
   private boolean validateOperation(
